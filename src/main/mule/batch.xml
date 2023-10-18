@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<file:config name="File_Config" doc:name="File Config" doc:id="4eca0060-7d1d-4a09-a354-3047428d30f9" />
+	<file:config name="File_Config1" doc:name="File Config" doc:id="6530523f-c3ac-48ea-a3e7-4cf022199cc9" />
+	<flow name="batchFlow" doc:id="031f4d80-dcd6-42e0-88e1-b70d39d89aa1" >
+		<file:listener doc:name="On New or Updated File" doc:id="bfe365ee-6972-49d8-9872-0517fc12a522" directory="${app.home}" autoDelete="true" moveToDirectory="C:\Users\91971\mulesoft_repo\batch\src\main\resources\out">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+			<file:matcher filenamePattern="*.csv" />
+		</file:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="e083ffb2-6158-4c3d-b0a4-32d9b0ddbe3b" message="#[mule.home]"/>
+		<set-variable value="#[1]" doc:name="Set Variable" doc:id="5aa52015-0b3a-4a02-abff-658a4f775982" variableName="a"/>
+		<batch:job jobName="batchBatch_Job" doc:id="5f93ac8e-f4d7-4004-94f4-4d5ceaca8ea7" maxFailedRecords="-1">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="b1997da6-77b3-4a41-ba97-b58a3eba196b" >
+					<logger level="INFO" doc:name="Logger" doc:id="bb2397df-cdab-4037-b7c7-749604ea02be" message="#[payload]"/>
+					<set-variable value="#[vars.a +1]" doc:name="Set Variable" doc:id="dc0556ef-f5de-46da-981d-3937e1338d73" variableName="updateda"/>
+					<logger level="INFO" doc:name="Logger" doc:id="22cceda7-2a17-4a79-a205-78d8222c23dd" message="#[vars.updateda]"/>
+					<logger level="INFO" doc:name="Logger" doc:id="a8e720bd-189f-42a5-9964-dd5a8659db56" message="#[payload.Region]"/>
+					<choice doc:name="Choice" doc:id="ae797b49-30b4-411c-b6e7-ab33bca2d1a5" >
+						<when expression='#[payload[0].Region == "Europe"]'>
+							<raise-error doc:name="Raise error" doc:id="b6601f13-9270-4b44-94a3-4e1e870ce1d5" type="MY:EXCEPTION" description="Region is Europe"/>
+						</when>
+						<otherwise >
+							<ee:transform doc:name="Transform Message" doc:id="e600e4cc-1177-414d-9f49-17e78b28e0a6">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload
+]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+						</otherwise>
+					</choice>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="c51d7895-5a07-45a5-9463-03bb3e4199e4" size="2">
+						<logger level="INFO" doc:name="Logger" doc:id="6e42c1f1-e18c-4db4-987f-7edc4b2f1556" message='#[output application/json &#10;--- {"after transform payload": payload }]' />
+						<file:write doc:name="Write" doc:id="c6bd997a-bfb7-470b-81b6-efb9ad007d1c" config-ref="File_Config1" path="C:\Users\91971\mulesoft_repo\batch\src\main\resources\outsuccess.json" mode="APPEND">
+							<file:content ><![CDATA[#[output application/json --- payload]]]></file:content>
+						</file:write>
+						<logger level="INFO" doc:name="Logger1" doc:id="7a608a5b-8b4c-4c20-be3d-72925b4e7ec6" message='#[{"updateda" :vars.updateda}]' />
+						<logger level="INFO" doc:name="Logger2" doc:id="e5f82fe8-560a-4256-ba7f-b46d4a5a6f7f" message='#[{"a" :vars.a}]' />
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="b283fe7e-9167-40b0-b103-fd2ccc8f928b" acceptPolicy="ONLY_FAILURES">
+					<ee:transform doc:name="Transform Message" doc:id="633de2c1-a6b3-4c66-bf1d-1b0de22c44fc" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="2e5de774-fbe8-40bc-a213-ce9df4c20cbf" streaming="true">
+						<file:write doc:name="Write" doc:id="3204acaf-9b94-4c80-8bfe-7e9041045140" config-ref="File_Config1" path="C:\Users\91971\mulesoft_repo\batch\src\main\resources\out\fail.json">
+							<file:content ><![CDATA[#[output application/json ---
+ payload]]]></file:content>
+						</file:write>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="142cfe7d-d50f-4e8f-bd62-09db64c830fa" message='#[%dw 2.0&#10;output application/json ---{"after on complete": payload}]'/>
+				<logger level="INFO" doc:name="Logger2" doc:id="d4539747-22e8-4e95-ad13-b205eed3b986" message='#[{"a" :vars.a}]' />
+				<logger level="INFO" doc:name="Logger1" doc:id="6dc74ddb-4288-4ca0-bcbe-1a4c16ba7fd5" message='#[{"updateda on com" :vars.updateda}]' />
+			</batch:on-complete>
+		</batch:job>
+		<logger level="INFO" doc:name="Logger" doc:id="07d81b3f-5566-4d0d-bd61-ca01540c3430" message='#[%dw 2.0&#10;output application/json &#10;---&#10;{"after batch": payload}]'/>
+	</flow>
+	<flow name="batchFlow1" doc:id="4ae410c3-ec73-4c3d-9f29-57fd15c59b44" initialState="stopped">
+		<file:listener doc:name="On New or Updated File" doc:id="260294f3-5306-45b0-881b-7b113d9a134a" directory="${app.home}" autoDelete="true" moveToDirectory="C:\Users\91971\mulesoft_repo\batch\src\main\resources\out" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+			<file:matcher filenamePattern="*.csv" />
+		</file:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="d78f05bd-a88d-4dfb-b39f-21c3c60ff753" message="#[mule.home]" />
+		<batch:job jobName="batchBatch_Job1" doc:id="973aec22-d8af-4063-8c24-f87e8f231a1b" maxFailedRecords="-1" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="f6e31f33-714d-4e5b-abcb-1080bcc4abaa" >
+					<logger level="INFO" doc:name="Logger" doc:id="534e792f-c97f-42a4-bc2f-52625eadab7e" message="#[payload]" />
+					<ee:transform doc:name="Transform Message" doc:id="d46dcbaa-aa09-4ba8-90f4-c525caad3276" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload[0]]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger1" doc:id="bf31bba2-64c0-4efd-8dbc-73ba71553dfb" message='#[output application/json &#10;--- {"after transform payload": payload}]' />
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="ac5a2373-3f9e-4306-a4b3-aa0b843e861d" size="8" >
+						<file:write doc:name="Write" doc:id="cdb9dec2-23ad-4049-9ae8-c57d3bc253c7" config-ref="File_Config1" path="C:\Users\91971\mulesoft_repo\batch\src\main\resources\outsuccess.json" mode="APPEND" >
+							<file:content ><![CDATA[#[output application/json --- payload map read($,"application/json")]]]></file:content>
+						</file:write>
+					</batch:aggregator>
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="9b17b326-d82c-4953-b3e4-2a0af768cefd" acceptPolicy="ONLY_FAILURES" >
+					<ee:transform doc:name="Transform Message" doc:id="64cb2db9-8809-4cab-8bce-00a0b15360c6" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="0a29558b-0850-4131-875f-d17c4345078b" streaming="true" >
+						<file:write doc:name="Write" doc:id="9451f7ea-c213-46d1-b7e8-ef4c093d1c16" config-ref="File_Config1" path="C:\Users\91971\mulesoft_repo\batch\src\main\resources\out\fail.json" >
+							<file:content ><![CDATA[#[output application/json ---
+ payload]]]></file:content>
+						</file:write>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="bd2876c3-fe3c-45f5-a087-16b535fa939b" message='#[%dw 2.0&#10;output application/json ---{"after on complete": payload}]' />
+			</batch:on-complete>
+		</batch:job>
+		<logger level="INFO" doc:name="Logger1" doc:id="ee7e65bd-0f67-4383-8825-cd6b8c747cf0" message='#[%dw 2.0&#10;output application/json &#10;---&#10;{"after batch": payload}]' />
+	</flow>
+</mule>
